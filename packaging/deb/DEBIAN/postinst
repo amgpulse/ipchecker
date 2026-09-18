@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+chmod +x /usr/bin/ipchecker
+update-desktop-database /usr/share/applications 2>/dev/null || true
+gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
+
+echo "IP Inspector Pro installed successfully!"
+echo "Run 'ipchecker' from terminal or find it in your application menu."

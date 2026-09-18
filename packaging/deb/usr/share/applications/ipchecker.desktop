@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=IP Inspector Pro
+Comment=Display local and public IP addresses with network details
+Exec=ipchecker
+Icon=ipchecker
+Terminal=false
+Type=Application
+Categories=Network;Utility;
+Keywords=ip;network;address;mac;internet;
+StartupNotify=true

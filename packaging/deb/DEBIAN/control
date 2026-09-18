@@ -1,0 +1,8 @@
+Package: ipchecker
+Version: 1.1.0
+Architecture: amd64
+Maintainer: IP Inspector Pro
+Depends: libqt6widgets6, libqt6network6, libqt6gui6, libqt6core6, libgl1, libc6
+Description: IP Inspector Pro - Network IP Information Tool with IPv6 support
+Section: net
+Priority: optional
