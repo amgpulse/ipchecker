@@ -1,0 +1,118 @@
+name: Build Releases
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-linux-deb:
+    name: Build Linux .deb
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt6 and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev build-essential dpkg-dev
+
+      - name: Build application
+        run: |
+          qmake6 ipchecker.pro
+          make -j$(nproc)
+
+      - name: Create .deb package
+        run: |
+          mkdir -p packaging/deb/DEBIAN
+          mkdir -p packaging/deb/usr/bin
+          mkdir -p packaging/deb/usr/share/applications
+          mkdir -p packaging/deb/usr/share/icons/hicolor/256x256/apps
+
+          cp ipchecker packaging/deb/usr/bin/ipchecker
+          chmod 755 packaging/deb/usr/bin/ipchecker
+
+          cat > packaging/deb/DEBIAN/control << 'EOF'
+          Package: ipchecker
+          Version: 1.1.0
+          Architecture: amd64
+          Maintainer: IP Inspector Pro
+          Depends: libqt6widgets6, libqt6network6, libqt6gui6, libqt6core6, libgl1, libc6
+          Description: IP Inspector Pro - Network IP Information Tool
+          Section: net
+          Priority: optional
+          EOF
+
+          cat > packaging/deb/usr/share/applications/ipchecker.desktop << 'EOF'
+          [Desktop Entry]
+          Name=IP Inspector Pro
+          Comment=Display local and public IP addresses
+          Exec=ipchecker
+          Icon=ipchecker
+          Terminal=false
+          Type=Application
+          Categories=Network;Utility;
+          EOF
+
+          chmod 755 packaging/deb/DEBIAN
+          dpkg-deb --build packaging/deb ipchecker_1.1.0_amd64.deb
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipchecker-linux-deb
+          path: ipchecker_1.1.0_amd64.deb
+
+  build-windows-exe:
+    name: Build Windows .exe
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.0'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_mingw'
+
+      - name: Build application
+        run: |
+          qmake6 ipchecker.pro -spec win32-g++ CONFIG+=release
+          mingw32-make -j4
+
+      - name: Deploy Qt libraries
+        run: |
+          windeployqt6 --release --no-translations --no-opengl-sw release/ipchecker.exe
+          Compress-Archive -Path release\* -DestinationPath ipchecker_1.1.0_windows_portable.zip
+
+      - name: Upload .exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipchecker-windows-portable
+          path: ipchecker_1.0.0_windows_portable.zip
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-linux-deb, build-windows-exe]
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+             artifacts/ipchecker-linux-deb/ipchecker_1.1.0_amd64.deb
+             artifacts/ipchecker-windows-portable/ipchecker_1.1.0_windows_portable.zip
+          generate_release_notes: true
