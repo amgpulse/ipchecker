@@ -1,0 +1,30 @@
+# Build artifacts (qmake/make)
+*.o
+*.obj
+moc_*.cpp
+moc_*.h
+moc_predefs.h
+ui_*.h
+qrc_*.cpp
+Makefile
+Makefile.*
+.qmake.stash
+*.pro.user
+*.pro.user.*
+
+# Compiled binaries
+/ipchecker
+/ipchecker.exe
+/release/
+/debug/
+
+# Packaged output (built by CI, not tracked)
+packaging/deb/usr/bin/ipchecker
+packaging/*.deb
+packaging/*.zip
+*.zip
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp

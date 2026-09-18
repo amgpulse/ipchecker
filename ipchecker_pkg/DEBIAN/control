@@ -1,0 +1,10 @@
+Package: ipchecker
+Version: 1.1.0
+Section: net
+Priority: optional
+Architecture: amd64
+Maintainer: IP Inspector Team <support@ipinspector.local>
+Depends: libc6, libqt6core6, libqt6gui6, libqt6widgets6, libqt6network6
+Description: IP Inspector Pro - Modern Qt6 network identity inspector
+ A fast, modern Qt6 desktop application that reveals local and public IP,
+ geolocation, MAC addresses, and network interfaces.
