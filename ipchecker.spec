@@ -13,7 +13,7 @@ A fast, modern Qt6 desktop application that reveals your network identity — yo
 # No setup needed for local build
 
 %build
-qmake-qt6 ipchecker.pro
+/usr/bin/qmake-qt6 ipchecker.pro || /usr/lib64/qt6/bin/qmake ipchecker.pro || qmake ipchecker.pro
 %make_build
 
 %install
