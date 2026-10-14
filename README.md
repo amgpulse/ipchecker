@@ -158,7 +158,8 @@ discuss what you'd like to change.
 Distributed under the **MIT License**. See `LICENSE` for more information.
 
 ---
-
+This project is under construction.
+---
 <div align="center">
 Made with ❤️ and **Qt** • [IP Inspector Pro](https://github.com/amg/ipchecker)
 </div>
