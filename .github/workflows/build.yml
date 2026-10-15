@@ -1,15 +1,46 @@
-name: Build Releases
+name: Build & Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-linux-deb:
-    name: Build Linux .deb
+  version:
+    name: Read version
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract VERSION from ipchecker.pro
+        id: read
+        shell: bash
+        run: |
+          version=$(sed -n 's/^VERSION[[:space:]]*=[[:space:]]*//p' ipchecker.pro | tr -d ' \r')
+          if [[ -z "$version" ]]; then
+            echo "::error::Could not read VERSION from ipchecker.pro"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building version $version"
+
+  build-linux-deb:
+    name: Linux .deb
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -18,55 +49,90 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qt6-base-dev build-essential dpkg-dev
 
-      - name: Build application
+      - name: Build
         run: |
           qmake6 ipchecker.pro
-          make -j$(nproc)
+          make -j"$(nproc)"
+
+      - name: Smoke test (headless)
+        run: |
+          set +e
+          timeout 10s env QT_QPA_PLATFORM=offscreen ./ipchecker
+          code=$?
+          set -e
+          if [ "$code" -ne 124 ]; then
+            echo "::error::Smoke test failed: app exited with code $code instead of staying alive"
+            exit 1
+          fi
 
       - name: Create .deb package
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          mkdir -p packaging/deb/DEBIAN
-          mkdir -p packaging/deb/usr/bin
-          mkdir -p packaging/deb/usr/share/applications
-          mkdir -p packaging/deb/usr/share/icons/hicolor/256x256/apps
-
+          strip --strip-unneeded ipchecker
           cp ipchecker packaging/deb/usr/bin/ipchecker
           chmod 755 packaging/deb/usr/bin/ipchecker
 
-          cat > packaging/deb/DEBIAN/control << 'EOF'
-          Package: ipchecker
-          Version: 1.1.0
-          Architecture: amd64
-          Maintainer: IP Inspector Pro
-          Depends: libqt6widgets6, libqt6network6, libqt6gui6, libqt6core6, libgl1, libc6
-          Description: IP Inspector Pro - Network IP Information Tool
-          Section: net
-          Priority: optional
-          EOF
+          sed -i "s/^Version:.*/Version: ${VERSION}/" packaging/deb/DEBIAN/control
+          echo "Installed-Size: $(du -ks packaging/deb/usr | cut -f1)" >> packaging/deb/DEBIAN/control
+          chmod 755 packaging/deb/DEBIAN/postinst packaging/deb/DEBIAN/postrm
 
-          cat > packaging/deb/usr/share/applications/ipchecker.desktop << 'EOF'
-          [Desktop Entry]
-          Name=IP Inspector Pro
-          Comment=Display local and public IP addresses
-          Exec=ipchecker
-          Icon=ipchecker
-          Terminal=false
-          Type=Application
-          Categories=Network;Utility;
-          EOF
+          dpkg-deb --build --root-owner-group packaging/deb "ipchecker_${VERSION}_amd64.deb"
+          dpkg-deb --info "ipchecker_${VERSION}_amd64.deb"
 
-          chmod 755 packaging/deb/DEBIAN
-          dpkg-deb --build packaging/deb ipchecker_1.1.0_amd64.deb
-
-      - name: Upload .deb artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ipchecker-linux-deb
-          path: ipchecker_1.1.0_amd64.deb
+          name: linux-deb
+          path: ipchecker_${{ needs.version.outputs.version }}_amd64.deb
 
-  build-windows-exe:
-    name: Build Windows .exe
+  build-linux-rpm:
+    name: Linux .rpm
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container: fedora:latest
+    steps:
+      - name: Install build tools
+        run: |
+          dnf install -y git qt6-qtbase-devel gcc-c++ make rpm-build tar gzip
+
+      - uses: actions/checkout@v4
+
+      - name: Build .rpm package
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          sed -i "s/^Version:.*/Version: ${VERSION}/" ipchecker.spec
+
+          mkdir -p "$HOME"/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          git archive --format=tar.gz \
+            --prefix="ipchecker-${VERSION}/" \
+            -o "$HOME/rpmbuild/SOURCES/ipchecker-${VERSION}.tar.gz" HEAD
+
+          rpmbuild -ba ipchecker.spec \
+            --define "_sourcedir $HOME/rpmbuild/SOURCES" \
+            --define "_builddir $HOME/rpmbuild/BUILD" \
+            --define "_rpmdir $HOME/rpmbuild/RPMS" \
+            --define "_specdir $HOME/rpmbuild/SPECS" \
+            --define "_srcrpmdir $HOME/rpmbuild/SRPMS"
+
+          find "$HOME/rpmbuild/RPMS" -name '*.rpm' -exec cp {} . \;
+          ls -la ./*.rpm
+          rpm -qip ./*.rpm
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-rpm
+          path: ./*.rpm
+
+  build-windows:
+    name: Windows .zip + installer
+    needs: version
     runs-on: windows-2022
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -76,29 +142,119 @@ jobs:
           version: '6.7.0'
           host: 'windows'
           target: 'desktop'
-          arch: 'win64_mingw'
+          arch: 'win64_msvc2019_64'
+          cache: true
 
-      - name: Build application
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build
+        id: build
+        shell: bash
         run: |
-          qmake6 ipchecker.pro -spec win32-g++ CONFIG+=release
-          mingw32-make -j4
+          set -euo pipefail
+          QMAKE="$(command -v qmake || command -v qmake6)"
+          "$QMAKE" ipchecker.pro CONFIG+=release
+          if ! nmake release; then
+            nmake
+          fi
+          if [ ! -f release/ipchecker.exe ]; then
+            echo "::error::release/ipchecker.exe was not produced"
+            find . -name 'ipchecker.exe'
+            exit 1
+          fi
+          echo "Built release/ipchecker.exe"
 
-      - name: Deploy Qt libraries
+      - name: Deploy Qt runtime
+        shell: bash
         run: |
-          windeployqt6 --release --no-translations --no-opengl-sw release/ipchecker.exe
-          Compress-Archive -Path release\* -DestinationPath ipchecker_1.1.0_windows_portable.zip
+          set -euo pipefail
+          WINDEPLOYQT="$(command -v windeployqt || command -v windeployqt6)"
+          "$WINDEPLOYQT" --release --compiler-runtime --no-translations release/ipchecker.exe
+          ls -la release/
 
-      - name: Upload .exe artifact
+      - name: Package portable zip
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          7z a "ipchecker_${VERSION}_windows_x64.zip" ./release/*
+
+      - name: Build installer (Inno Setup)
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          sed -i "s/^#define MyAppVersion .*/#define MyAppVersion \"${VERSION}\"/" packaging/windows/ipinstaller.iss
+          if command -v iscc >/dev/null 2>&1; then
+            ISCC="iscc"
+          else
+            ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          fi
+          "$ISCC" packaging/windows/ipinstaller.iss
+          ls -la packaging/windows/*.exe
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ipchecker-windows-portable
-          path: ipchecker_1.0.0_windows_portable.zip
+          name: windows
+          path: |
+            ipchecker_${{ needs.version.outputs.version }}_windows_x64.zip
+            packaging/windows/ipchecker_${{ needs.version.outputs.version }}_setup.exe
 
-  create-release:
+  build-macos:
+    name: macOS .zip + .dmg
+    needs: version
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.0'
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'
+          cache: true
+
+      - name: Build
+        run: |
+          qmake ipchecker.pro
+          make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Deploy Qt runtime into app bundle
+        run: macdeployqt ipchecker.app -always-overwrite
+
+      - name: Package .zip and .dmg
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          ditto -c -k --keepParent ipchecker.app "ipchecker_${VERSION}_macos.zip"
+
+          STAGE="$(mktemp -d)"
+          cp -R ipchecker.app "$STAGE/"
+          hdiutil create -volname "IP Inspector Pro" -srcfolder "$STAGE" -ov \
+            -format UDZO "ipchecker_${VERSION}_macos.dmg"
+          ls -la "ipchecker_${VERSION}_macos.zip" "ipchecker_${VERSION}_macos.dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            ipchecker_${{ needs.version.outputs.version }}_macos.zip
+            ipchecker_${{ needs.version.outputs.version }}_macos.dmg
+
+  release:
     name: Create GitHub Release
-    needs: [build-linux-deb, build-windows-exe]
+    needs: [version, build-linux-deb, build-linux-rpm, build-windows, build-macos]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
-    if: startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
@@ -109,10 +265,48 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-             artifacts/ipchecker-linux-deb/ipchecker_1.1.0_amd64.deb
-             artifacts/ipchecker-windows-portable/ipchecker_1.1.0_windows_portable.zip
-          generate_release_notes: true
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t assets < <(find artifacts -type f | sort)
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "::error::No release assets found"
+            exit 1
+          fi
+          printf 'Asset: %s\n' "${assets[@]}"
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            # A pushed version tag produces a full release.
+            TAG="$GITHUB_REF_NAME"
+            TITLE="$TAG"
+            CREATE_ARGS=(--title "$TAG" --generate-notes)
+          else
+            # Every push to main updates the rolling "continuous" prerelease.
+            TAG="continuous"
+            TITLE="Continuous Build (${GITHUB_REF_NAME})"
+            CREATE_ARGS=(
+              --title "$TITLE"
+              --notes "Automatic build of ${GITHUB_SHA:0:7} on ${GITHUB_REF_NAME} (version ${VERSION})."
+              --prerelease
+              --latest=false
+            )
+          fi
+
+          if [ "$TAG" = "continuous" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -f "$TAG" "$GITHUB_SHA"
+            git push --force origin "refs/tags/$TAG"
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE"
+          else
+            gh release create "$TAG" "${CREATE_ARGS[@]}"
+          fi
+
+          gh release upload "$TAG" "${assets[@]}" --clobber

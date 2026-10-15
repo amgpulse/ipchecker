@@ -13,7 +13,10 @@ echo ========================================
 echo  IP Inspector Pro - Windows Build
 echo ========================================
 
-REM Find qmake
+REM Always run from the repository root (this script lives in packaging\windows)
+cd /d "%~dp0\..\.."
+
+REM Find qmake (Qt for Windows ships "qmake.exe", not "qmake6.exe")
 where qmake6 >nul 2>nul
 if %errorlevel% neq 0 (
     where qmake >nul 2>nul
@@ -32,7 +35,7 @@ if exist "%QT_PATH%\%QT_VERSION%\%COMPILER%\bin\qmake6.exe" (
 
 echo.
 echo [1/3] Running qmake...
-qmake6 ipchecker.pro -spec win32-g++ CONFIG+=release 2>nul || qmake ipchecker.pro -spec win32-g++ CONFIG+=release
+qmake ipchecker.pro -spec win32-g++ CONFIG+=release 2>nul || qmake6 ipchecker.pro -spec win32-g++ CONFIG+=release
 if %errorlevel% neq 0 (
     echo ERROR: qmake failed!
     pause

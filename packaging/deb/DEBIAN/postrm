@@ -1,7 +1,7 @@
-#!/bin/bash
-rm -f /usr/bin/ipchecker
-rm -f /usr/share/applications/ipchecker.desktop
-rm -f /usr/share/icons/hicolor/256x256/apps/ipchecker.png
-update-desktop-database /usr/share/applications 2>/dev/null || true
-gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
-echo "IP Inspector Pro uninstalled."
+#!/bin/sh
+set -e
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    update-desktop-database /usr/share/applications >/dev/null 2>&1 || true
+    gtk-update-icon-cache /usr/share/icons/hicolor >/dev/null 2>&1 || true
+fi
+exit 0

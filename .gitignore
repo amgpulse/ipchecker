@@ -18,11 +18,15 @@ Makefile.*
 /release/
 /debug/
 
-# Packaged output (built by CI, not tracked)
-packaging/deb/usr/bin/ipchecker
-packaging/*.deb
-packaging/*.zip
+# Packaged output (built locally or by CI, never tracked)
+*.deb
+*.rpm
+*.exe
+*.dmg
 *.zip
+ipchecker_pkg/
+packaging/deb/usr/bin/ipchecker
+packaging/windows/ipchecker_*_setup.exe
 
 # OS / editor cruft
 .DS_Store

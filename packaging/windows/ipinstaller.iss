@@ -5,8 +5,8 @@
 ; ==========================================================
 
 #define MyAppName "IP Inspector Pro"
-#define MyAppVersion "1.0.0"
-#define MyAppPublisher "IP Inspector"
+#define MyAppVersion "1.2.0"
+#define MyAppPublisher "AMG Pulse"
 #define MyAppExeName "ipchecker.exe"
 #define BuildDir "..\..\release"
 
