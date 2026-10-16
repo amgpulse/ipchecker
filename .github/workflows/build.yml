@@ -96,7 +96,7 @@ jobs:
     steps:
       - name: Install build tools
         run: |
-          dnf install -y git qt6-qtbase-devel gcc-c++ make rpm-build tar gzip
+          dnf install -y git qt6-qtbase-devel gcc-c++ make rpm-build tar gzip desktop-file-utils
 
       - uses: actions/checkout@v4
 
@@ -152,22 +152,15 @@ jobs:
 
       - name: Build
         id: build
-        shell: bash
+        shell: cmd
         run: |
-          set -euo pipefail
-          export PATH="/c/Windows/system32:/c/Windows:/c/Windows/System32/Wbem:$PATH"
-          
-          QMAKE="$(command -v qmake || command -v qmake6)"
-          "$QMAKE" ipchecker.pro CONFIG+=release
-          if ! nmake release; then
-            nmake
-          fi
-          if [ ! -f release/ipchecker.exe ]; then
+          qmake ipchecker.pro CONFIG+=release
+          nmake release || nmake
+          if not exist release\ipchecker.exe (
             echo "::error::release/ipchecker.exe was not produced"
-            find . -name 'ipchecker.exe'
-            exit 1
-          fi
-          echo "Built release/ipchecker.exe"
+            exit /b 1
+          )
+          echo Built release/ipchecker.exe
 
       - name: Deploy Qt runtime
         shell: bash
