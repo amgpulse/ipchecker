@@ -96,6 +96,7 @@ private:
     bool darkTheme;
     bool autoRefreshEnabled;
     bool trayCloseNotified = false;
+    qint64 lastTrayToggleTimestamp = 0;
 
     QString localIpv4;
     QString localIpv6;

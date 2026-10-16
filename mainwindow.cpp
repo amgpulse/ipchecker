@@ -1270,7 +1270,22 @@ void MainWindow::toast(const QString &message, int timeoutMs)
 
 void MainWindow::onTrayActivated(QSystemTrayIcon::ActivationReason reason)
 {
-    if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) {
+    if (reason != QSystemTrayIcon::Trigger && reason != QSystemTrayIcon::DoubleClick) {
+        return;
+    }
+
+    // Some platforms emit Trigger and then DoubleClick for one double click;
+    // ignore the second event so a single gesture produces exactly one toggle.
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (lastTrayToggleTimestamp != 0 && now - lastTrayToggleTimestamp < 400) {
+        return;
+    }
+    lastTrayToggleTimestamp = now;
+
+    // Toggle: click hides a visible window to the tray, click shows it again.
+    if (isVisible() && !isMinimized()) {
+        hide();
+    } else {
         showWindow();
     }
 }
