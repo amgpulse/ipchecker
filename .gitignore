@@ -4,6 +4,7 @@
 moc_*.cpp
 moc_*.h
 moc_predefs.h
+*.moc
 ui_*.h
 qrc_*.cpp
 Makefile
@@ -15,6 +16,7 @@ Makefile.*
 # Compiled binaries
 /ipchecker
 /ipchecker.exe
+/tests/tst_netutils
 /release/
 /debug/
 

@@ -5,7 +5,6 @@
 #include <QComboBox>
 #include <QDateTime>
 #include <QHash>
-#include <QHostInfo>
 #include <QLabel>
 #include <QLineEdit>
 #include <QList>
@@ -64,11 +63,8 @@ private:
     void loadSettings();
     void saveSettings();
     void populateInterfaces();
-    void detectLocalIps();
-    QString getMacAddress() const;
-    QString getHostname() const;
-    bool isOnline() const;
     void fetchPublicIp();
+    void finishPublicIpCycle();
     void fetchGeoInfo(const QString &ip);
     void updatePublicIpDisplay();
     void updateLocalIpDisplay();
@@ -76,6 +72,7 @@ private:
     void updateSystemTray();
     void recordHistory();
     void saveHistory();
+    void saveGeoCache();
     void toast(const QString &message, int timeoutMs = 3000);
 
     QNetworkAccessManager *networkManager = nullptr;
@@ -103,6 +100,10 @@ private:
     QString publicIpv4;
     QString publicIpv6;
     QString publicIpErrorText = QStringLiteral("Loading...");
+    QString publicIpLastError;
+    QString publicIpStaleText;
+    int publicIpPendingResponses = 0;
+    bool publicIpCycleHadSuccess = false;
 
     QList<IpHistoryEntry> historyList;
     QHash<QString, QString> geoCache;
@@ -113,6 +114,7 @@ private:
 
     static constexpr int kNetworkTimeoutMs = 8000;
     static constexpr int kMaxHistoryEntries = 50;
+    static constexpr int kMaxGeoCacheEntries = 100;
 };
 
 #endif // MAINWINDOW_H

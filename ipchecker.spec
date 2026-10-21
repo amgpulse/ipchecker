@@ -1,5 +1,5 @@
 Name:           ipchecker
-Version:        1.2.0
+Version:        1.3.0
 Release:        1%{?dist}
 Summary:        IP Inspector Pro - Modern Qt6 network identity inspector
 License:        MIT
@@ -39,6 +39,12 @@ install -D -m 0644 packaging/deb/usr/share/icons/hicolor/256x256/apps/ipchecker.
 %{_datadir}/icons/hicolor/256x256/apps/ipchecker.png
 
 %changelog
+* Thu Oct 22 2026 AMG <amgpulse@users.noreply.github.com> - 1.3.0-1
+- Extract testable network logic into netutils and add a Qt Test suite (CI-gated)
+- Persist the geolocation cache, cap stored history/geo entries
+- Show last-known public IP with a stale marker when a refresh fails
+- Move light/dark themes into QSS resources
+
 * Thu Oct 15 2026 AMG <amgpulse@users.noreply.github.com> - 1.2.0-1
 - Fix network timeouts, JSON parsing and IPv4/IPv6 display race
 - Add IP history viewer, configurable refresh, single-instance support

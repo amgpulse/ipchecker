@@ -1,0 +1,51 @@
+QMainWindow, #centralWidget { background-color: #1e1e2e; }
+QWidget { color: #cdd6f4; }
+#titleLabel { color: #89b4fa; }
+#sectionTitle { color: #cdd6f4; padding: 5px; }
+#subtitle { color: #7f849c; }
+#valueText { color: #cdd6f4; }
+#footnote { color: #585b70; }
+#card { background-color: #313244; border-radius: 10px; }
+#iconLocal { color: #89b4fa; }
+#iconPublic { color: #f38ba8; }
+#iconGeo { color: #a6e3a1; }
+#iconSystem { color: #cba6f7; }
+#statusOnline { color: #a6e3a1; }
+#statusOffline { color: #f38ba8; }
+#separator { background-color: #45475a; }
+QPushButton { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 5px; padding: 5px 10px; }
+QPushButton:hover { background-color: #45475a; border-color: #89b4fa; }
+QPushButton:pressed { background-color: #585b70; }
+#toolButton { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 5px; }
+#copyBtn { background-color: #45475a; color: #cdd6f4; border: 1px solid #585b70; border-radius: 4px; }
+#copyBtn:hover { background-color: #89b4fa; color: #1e1e2e; border-color: #89b4fa; }
+#btnPrimary { background-color: #89b4fa; color: #1e1e2e; border: none; border-radius: 5px; }
+#btnPrimary:hover { background-color: #b4befe; }
+#btnPrimary:pressed { background-color: #74c7ec; }
+#btnSuccess { background-color: #a6e3a1; color: #1e1e2e; border: none; border-radius: 5px; }
+#btnSuccess:hover { background-color: #b5e8b0; }
+#btnSuccess:pressed { background-color: #94d68f; }
+#btnDanger { background-color: #f38ba8; color: #1e1e2e; border: none; border-radius: 5px; }
+#btnDanger:hover { background-color: #eba0bc; }
+#btnDanger:pressed { background-color: #eb779e; }
+#searchBox { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 5px; padding: 5px; }
+#searchBox:focus { border: 2px solid #89b4fa; }
+#intervalCombo { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 5px; padding: 4px 8px; }
+#intervalCombo:hover { border-color: #89b4fa; }
+#intervalCombo::drop-down { border: none; width: 18px; }
+#intervalCombo QAbstractItemView { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; selection-background-color: #89b4fa; selection-color: #1e1e2e; }
+#interfacesTable { background-color: #1e1e2e; alternate-background-color: #313244; border: 1px solid #45475a; border-radius: 5px; gridline-color: #45475a; }
+#interfacesTable::item { padding: 5px; color: #cdd6f4; }
+#interfacesTable::item:selected { background-color: #89b4fa; color: #1e1e2e; }
+QHeaderView::section { background-color: #313244; color: #cdd6f4; padding: 6px; border: none; border-bottom: 1px solid #45475a; font-weight: bold; }
+QScrollBar:vertical { background: #1e1e2e; width: 10px; border: none; }
+QScrollBar::handle:vertical { background: #45475a; border-radius: 5px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QDialog { background-color: #1e1e2e; }
+QMenu { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; }
+QMenu::item:selected { background-color: #45475a; }
+QMessageBox { background-color: #1e1e2e; }
+QMessageBox QLabel { color: #cdd6f4; }
+QStatusBar { background: transparent; color: #7f849c; }
+QStatusBar::item { border: none; }
+QFileDialog { background-color: #1e1e2e; color: #cdd6f4; }

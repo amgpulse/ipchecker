@@ -6,14 +6,16 @@ TEMPLATE = app
 CONFIG += c++17
 
 # Single source of truth for the app version: CI reads it from this file.
-VERSION = 1.2.0
+VERSION = 1.3.0
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += main.cpp \
-           mainwindow.cpp
+           mainwindow.cpp \
+           netutils.cpp
 
-HEADERS += mainwindow.h
+HEADERS += mainwindow.h \
+           netutils.h
 
 RESOURCES += ipchecker.qrc
 

@@ -1,5 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file alias="icons/ipchecker.png">packaging/deb/usr/share/icons/hicolor/256x256/apps/ipchecker.png</file>
+        <file alias="themes/light.qss">resources/themes/light.qss</file>
+        <file alias="themes/dark.qss">resources/themes/dark.qss</file>
     </qresource>
 </RCC>

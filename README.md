@@ -26,13 +26,13 @@ hostnames, and every network interface — wrapped in a clean, cross-platform UI
   IPv6, picked via the OS routing table) and your external-facing public IP via
   background async requests with timeouts (the UI never freezes).
 - 🗺️ **Geolocation** — city, region, country, and organization for your public
-  IP, cached so it is only re-fetched when your IP actually changes.
+  IP, cached persistently so it is only re-fetched when your IP actually changes.
 - 🖧 **Network Interfaces table** — every interface with IP, MAC, status, and
   type, sortable, with a live **filter/search box** across all columns.
 - 💻 **System info** — hostname and MAC address in one glance.
 - 🌙 **Dark / Light themes** — easy on the eyes, whichever way you roll.
 - 🔄 **Auto-refresh** — configurable interval (10s / 30s / 1m / 5m / 15m),
-  toggglable from the toolbar.
+  toggleable from the toolbar.
 - 🕘 **IP history** — every public IP change is recorded with a timestamp and
   shown in a history dialog (stored locally in your settings).
 - 📤 **Export** — save a full network report as **plain text or real JSON**.
@@ -105,6 +105,20 @@ macdeployqt ipchecker.app
 open ipchecker.app
 ```
 
+### Run the tests
+
+The pure parsing / interval logic lives in `netutils.{h,cpp}` and is covered by
+Qt Test. The suite needs `qt6-base-dev` (Linux) or any Qt 6 install:
+
+```bash
+cd tests
+qmake6 tests.pro
+make -j"$(nproc)"
+QT_QPA_PLATFORM=offscreen ./tst_netutils
+```
+
+The same suite runs in CI on every push and pull request, and gates releases.
+
 ---
 
 ## 📦 Installation (prebuilt binaries)
@@ -164,8 +178,8 @@ Release behaviour:
 
 ```bash
 # Cut a release
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.3.0
+git push origin v1.3.0
 ```
 
 The app version lives in **one place** — `VERSION` in `ipchecker.pro` — and CI
@@ -182,8 +196,8 @@ IP Inspector Pro talks to exactly two third-party services:
 | Public IP      | `api.ipify.org`   | To discover your public IPv4/IPv6    |
 | Geolocation    | `ipapi.co`        | City/region/country/org for that IP  |
 
-Nothing else leaves your machine, geolocation lookups are cached, and the
-information is also shown in the app itself.
+Nothing else leaves your machine, geolocation lookups are cached locally
+(`QSettings`), and the information is also shown in the app itself.
 
 ---
 
