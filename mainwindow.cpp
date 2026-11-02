@@ -29,8 +29,11 @@
 #include <QMenu>
 #include <QNetworkInterface>
 #include <QNetworkRequest>
+#include <QMessageBox>
+#include <QProcess>
 #include <QPushButton>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QStatusBar>
 #include <QTableWidget>
 #include <QTimer>
@@ -422,6 +425,13 @@ void MainWindow::setupUi()
     exportBtn->setFont(sizedFont(11, true));
     buttonLayout->addWidget(exportBtn);
     connect(exportBtn, &QPushButton::clicked, this, &MainWindow::exportData);
+
+    speedTestButton = new QPushButton(tr("Speed Test"), this);
+    speedTestButton->setFixedSize(115, 35);
+    speedTestButton->setFont(sizedFont(11, true));
+    speedTestButton->setToolTip(tr("Measure download, upload, and latency with Ookla Speedtest"));
+    buttonLayout->addWidget(speedTestButton);
+    connect(speedTestButton, &QPushButton::clicked, this, &MainWindow::startSpeedTest);
 
     QPushButton *clearHistoryBtn = new QPushButton(tr("Clear History"), this);
     clearHistoryBtn->setObjectName(QStringLiteral("btnDanger"));
@@ -898,6 +908,101 @@ void MainWindow::clearHistory()
     historyList.clear();
     saveHistory();
     toast(tr("IP history cleared"));
+}
+
+void MainWindow::startSpeedTest()
+{
+    if (speedTestProcess && speedTestProcess->state() != QProcess::NotRunning) {
+        return;
+    }
+
+    const QString executable = QStandardPaths::findExecutable(QStringLiteral("speedtest"));
+    if (executable.isEmpty()) {
+        QMessageBox::information(
+            this, tr("Ookla Speedtest CLI Required"),
+            tr("Install the official Ookla Speedtest CLI and make sure the 'speedtest' command is "
+               "available on PATH."));
+        return;
+    }
+
+    const QMessageBox::StandardButton consent = QMessageBox::question(
+        this, tr("Run Ookla Speedtest"),
+        tr("This test sends network traffic to Ookla Speedtest servers and may use a significant "
+           "amount of data. Continuing also accepts the Ookla CLI license and GDPR terms. Do you "
+           "want to continue?"),
+        QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+    if (consent != QMessageBox::Yes) {
+        return;
+    }
+
+    if (!speedTestProcess) {
+        speedTestProcess = new QProcess(this);
+        connect(speedTestProcess, &QProcess::finished, this, &MainWindow::onSpeedTestFinished);
+        connect(speedTestProcess, &QProcess::errorOccurred, this, &MainWindow::onSpeedTestError);
+    }
+
+    speedTestButton->setEnabled(false);
+    speedTestButton->setText(tr("Testing..."));
+    toast(tr("Running Ookla Speedtest; this may take a little while."), 10000);
+    speedTestProcess->start(executable,
+                            {QStringLiteral("--accept-license"), QStringLiteral("--accept-gdpr"),
+                             QStringLiteral("--format=json")});
+}
+
+void MainWindow::onSpeedTestFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    const QByteArray output = speedTestProcess->readAllStandardOutput();
+    const QString errorOutput = QString::fromLocal8Bit(speedTestProcess->readAllStandardError()).trimmed();
+    speedTestButton->setEnabled(true);
+    speedTestButton->setText(tr("Speed Test"));
+
+    if (exitStatus != QProcess::NormalExit || exitCode != 0) {
+        const QString details = errorOutput.isEmpty() ? tr("Ookla Speedtest exited with code %1.").arg(exitCode)
+                                                      : errorOutput;
+        QMessageBox::warning(this, tr("Speed Test Failed"), details);
+        return;
+    }
+
+    const NetUtils::SpeedTestResult result = NetUtils::parseSpeedTestJson(output);
+    if (!result.parsed) {
+        const QString details = errorOutput.isEmpty() ? tr("The CLI returned an invalid result.")
+                                                      : errorOutput;
+        QMessageBox::warning(this, tr("Speed Test Failed"), details);
+        return;
+    }
+
+    QString summary = tr("Download: %1 Mbps\nUpload: %2 Mbps\nLatency: %3 ms")
+                          .arg(result.downloadMbps, 0, 'f', 2)
+                          .arg(result.uploadMbps, 0, 'f', 2)
+                          .arg(result.latencyMs, 0, 'f', 2);
+    QStringList serverParts;
+    if (!result.serverName.isEmpty()) {
+        serverParts << result.serverName;
+    }
+    if (!result.serverLocation.isEmpty()) {
+        serverParts << result.serverLocation;
+    }
+    const QString server = serverParts.join(QStringLiteral(", "));
+    if (!server.isEmpty()) {
+        summary += QStringLiteral("\n") + tr("Server: %1").arg(server);
+    }
+    if (!result.resultUrl.isEmpty()) {
+        summary += QStringLiteral("\n\n") + tr("Result: %1").arg(result.resultUrl);
+    }
+    QMessageBox::information(this, tr("Speed Test Results"), summary);
+}
+
+void MainWindow::onSpeedTestError(QProcess::ProcessError error)
+{
+    if (error != QProcess::FailedToStart) {
+        return;
+    }
+
+    speedTestButton->setEnabled(true);
+    speedTestButton->setText(tr("Speed Test"));
+    QMessageBox::warning(this, tr("Speed Test Failed"),
+                         tr("Could not start Ookla Speedtest. Check that the CLI is installed and "
+                            "available on PATH."));
 }
 
 void MainWindow::copyToLocalClipboard()

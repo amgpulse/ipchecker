@@ -36,6 +36,8 @@ hostnames, and every network interface — wrapped in a clean, cross-platform UI
 - 🕘 **IP history** — every public IP change is recorded with a timestamp and
   shown in a history dialog (stored locally in your settings).
 - 📤 **Export** — save a full network report as **plain text or real JSON**.
+- 🚀 **Internet speed test** — measure download, upload, and latency with the
+  official Ookla Speedtest CLI.
 - 🔖 **System tray** — closing the window keeps the app running in the tray;
   quit from the tray menu.
 - 📋 **Copy-to-clipboard** — one click (or double-click a table row) to copy.
@@ -59,6 +61,13 @@ hostnames, and every network interface — wrapped in a clean, cross-platform UI
 - **Linux (Debian/Ubuntu based):** Qt 6 base dev packages + a C++17 compiler.
 - **Windows:** Qt 6 (MinGW 64-bit or MSVC) toolchain, e.g. `6.7.0`.
 - **macOS:** Qt 6 + Xcode command line tools.
+- **Speed test (optional):** install the official
+  [Ookla Speedtest CLI](https://www.speedtest.net/apps/cli) and make its
+  `speedtest` command available on `PATH`.
+
+The speed test runs only when requested. Before each run, the app asks for
+consent because the test sends traffic to Ookla servers, can use significant
+data, and accepts the CLI license and GDPR terms.
 
 ---
 

@@ -26,6 +26,18 @@ struct GeoInfo {
 
 GeoInfo parseGeoInfo(const QByteArray &payload);
 
+struct SpeedTestResult {
+    bool parsed = false;
+    double downloadMbps = 0.0;
+    double uploadMbps = 0.0;
+    double latencyMs = 0.0;
+    QString serverName;
+    QString serverLocation;
+    QString resultUrl;
+};
+
+SpeedTestResult parseSpeedTestJson(const QByteArray &payload);
+
 bool detectLocalAddresses(QString *ipv4, QString *ipv6);
 bool isOnline();
 QString macAddress();

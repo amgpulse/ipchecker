@@ -12,6 +12,7 @@
 #include <QMenu>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QProcess>
 #include <QPushButton>
 #include <QString>
 #include <QStringList>
@@ -55,6 +56,9 @@ private slots:
     void showHistory();
     void clearHistory();
     void filterInterfaces();
+    void startSpeedTest();
+    void onSpeedTestFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onSpeedTestError(QProcess::ProcessError error);
 
 private:
     void setupUi();
@@ -86,8 +90,10 @@ private:
     QLineEdit *searchBox = nullptr;
     QSystemTrayIcon *trayIcon = nullptr;
     QTimer *autoRefreshTimer = nullptr;
+    QProcess *speedTestProcess = nullptr;
     QPushButton *themeButton = nullptr;
     QPushButton *autoRefreshButton = nullptr;
+    QPushButton *speedTestButton = nullptr;
     QComboBox *intervalCombo = nullptr;
 
     bool darkTheme;
