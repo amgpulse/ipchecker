@@ -36,8 +36,8 @@ hostnames, and every network interface — wrapped in a clean, cross-platform UI
 - 🕘 **IP history** — every public IP change is recorded with a timestamp and
   shown in a history dialog (stored locally in your settings).
 - 📤 **Export** — save a full network report as **plain text or real JSON**.
-- 🚀 **Internet speed test** — measure download, upload, and latency with the
-  official Ookla Speedtest CLI.
+- 🚀 **Internet speed test** — measure download, upload, and latency directly
+  from the app; no extra program or CLI is required.
 - 🔖 **System tray** — closing the window keeps the app running in the tray;
   quit from the tray menu.
 - 📋 **Copy-to-clipboard** — one click (or double-click a table row) to copy.
@@ -61,13 +61,10 @@ hostnames, and every network interface — wrapped in a clean, cross-platform UI
 - **Linux (Debian/Ubuntu based):** Qt 6 base dev packages + a C++17 compiler.
 - **Windows:** Qt 6 (MinGW 64-bit or MSVC) toolchain, e.g. `6.7.0`.
 - **macOS:** Qt 6 + Xcode command line tools.
-- **Speed test (optional):** install the official
-  [Ookla Speedtest CLI](https://www.speedtest.net/apps/cli) and make its
-  `speedtest` command available on `PATH`.
 
-The speed test runs only when requested. Before each run, the app asks for
-consent because the test sends traffic to Ookla servers, can use significant
-data, and accepts the CLI license and GDPR terms.
+The speed test uses Qt's built-in network support and Cloudflare's public
+`speed.cloudflare.com` endpoint. It runs only when requested and asks for
+consent before transferring about 12 MB of test data.
 
 ---
 
@@ -187,8 +184,8 @@ Release behaviour:
 
 ```bash
 # Cut a release
-git tag v1.3.0
-git push origin v1.3.0
+git tag v1.4.2
+git push origin v1.4.2
 ```
 
 The app version lives in **one place** — `VERSION` in `ipchecker.pro` — and CI
@@ -198,15 +195,17 @@ reads it from there for every package and release.
 
 ## 🔒 Privacy
 
-IP Inspector Pro talks to exactly two third-party services:
+IP Inspector Pro contacts these third-party services:
 
 | Data           | Service           | Why                                  |
 |----------------|-------------------|--------------------------------------|
 | Public IP      | `api.ipify.org`   | To discover your public IPv4/IPv6    |
 | Geolocation    | `ipapi.co`        | City/region/country/org for that IP  |
+| Speed test     | `speed.cloudflare.com` | Download, upload, and latency test; only when started by the user |
 
-Nothing else leaves your machine, geolocation lookups are cached locally
-(`QSettings`), and the information is also shown in the app itself.
+The speed test sends about 12 MB to Cloudflare and exposes your public IP to
+that service. It runs only after you confirm. Geolocation lookups are cached
+locally (`QSettings`), and the information is also shown in the app itself.
 
 ---
 
@@ -220,8 +219,8 @@ Nothing else leaves your machine, geolocation lookups are cached locally
 - [x] Persistent IP history viewer
 - [x] Single-instance support + close-to-tray
 - [x] Automatic multi-platform releases (Linux, Windows, macOS)
+- [x] Built-in download, upload, and latency test
 - [ ] Who-is & DNS lookup
-- [ ] Network speed / latency test
 
 ---
 

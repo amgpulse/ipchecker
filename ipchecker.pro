@@ -6,7 +6,7 @@ TEMPLATE = app
 CONFIG += c++17
 
 # Single source of truth for the app version: CI reads it from this file.
-VERSION = 1.4.1
+VERSION = 1.4.2
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 DEFINES += QT_DEPRECATED_WARNINGS
 

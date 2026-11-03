@@ -8,7 +8,6 @@
 #include <QNetworkInterface>
 #include <QStringList>
 #include <QUdpSocket>
-#include <cmath>
 
 namespace {
 
@@ -136,46 +135,14 @@ GeoInfo parseGeoInfo(const QByteArray &payload)
     return info;
 }
 
-SpeedTestResult parseSpeedTestJson(const QByteArray &payload)
+double speedMbps(qint64 bytesTransferred, qint64 elapsedMs)
 {
-    SpeedTestResult result;
-
-    QJsonParseError parseError{};
-    const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
-    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
-        return result;
+    if (bytesTransferred <= 0 || elapsedMs <= 0) {
+        return 0.0;
     }
 
-    const QJsonObject obj = doc.object();
-    const QJsonObject download = obj.value(QStringLiteral("download")).toObject();
-    const QJsonObject upload = obj.value(QStringLiteral("upload")).toObject();
-    const QJsonObject ping = obj.value(QStringLiteral("ping")).toObject();
-    const QJsonValue downloadBandwidth = download.value(QStringLiteral("bandwidth"));
-    const QJsonValue uploadBandwidth = upload.value(QStringLiteral("bandwidth"));
-    const QJsonValue latency = ping.value(QStringLiteral("latency"));
-    if (!downloadBandwidth.isDouble() || !uploadBandwidth.isDouble() || !latency.isDouble()) {
-        return result;
-    }
-
-    const double downloadBytesPerSecond = downloadBandwidth.toDouble();
-    const double uploadBytesPerSecond = uploadBandwidth.toDouble();
-    result.latencyMs = latency.toDouble();
-    if (!std::isfinite(downloadBytesPerSecond) || !std::isfinite(uploadBytesPerSecond)
-        || !std::isfinite(result.latencyMs) || downloadBytesPerSecond < 0
-        || uploadBytesPerSecond < 0 || result.latencyMs < 0) {
-        return SpeedTestResult();
-    }
-
-    constexpr double kBitsPerMegabit = 1000000.0;
-    result.downloadMbps = downloadBytesPerSecond * 8.0 / kBitsPerMegabit;
-    result.uploadMbps = uploadBytesPerSecond * 8.0 / kBitsPerMegabit;
-
-    const QJsonObject server = obj.value(QStringLiteral("server")).toObject();
-    result.serverName = server.value(QStringLiteral("name")).toString();
-    result.serverLocation = server.value(QStringLiteral("location")).toString();
-    result.resultUrl = obj.value(QStringLiteral("result")).toObject().value(QStringLiteral("url")).toString();
-    result.parsed = true;
-    return result;
+    return static_cast<double>(bytesTransferred) * 8.0
+           / (static_cast<double>(elapsedMs) * 1000.0);
 }
 
 bool detectLocalAddresses(QString *ipv4, QString *ipv6)

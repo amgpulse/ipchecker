@@ -4,6 +4,7 @@
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QLabel>
 #include <QLineEdit>
@@ -12,7 +13,6 @@
 #include <QMenu>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
-#include <QProcess>
 #include <QPushButton>
 #include <QString>
 #include <QStringList>
@@ -20,6 +20,7 @@
 #include <QSystemTrayIcon>
 #include <QTableWidget>
 #include <QTimer>
+#include <QVector>
 
 struct IpHistoryEntry {
     QDateTime timestamp;
@@ -57,8 +58,13 @@ private slots:
     void clearHistory();
     void filterInterfaces();
     void startSpeedTest();
-    void onSpeedTestFinished(int exitCode, QProcess::ExitStatus exitStatus);
-    void onSpeedTestError(QProcess::ProcessError error);
+    void runSpeedTestLatencyProbe();
+    void onSpeedTestLatencyFinished(QNetworkReply *reply);
+    void runSpeedTestDownload();
+    void onSpeedTestDownloadFinished(QNetworkReply *reply);
+    void runSpeedTestUpload();
+    void onSpeedTestUploadFinished(QNetworkReply *reply);
+    void finishSpeedTest(const QString &error = QString());
 
 private:
     void setupUi();
@@ -90,7 +96,14 @@ private:
     QLineEdit *searchBox = nullptr;
     QSystemTrayIcon *trayIcon = nullptr;
     QTimer *autoRefreshTimer = nullptr;
-    QProcess *speedTestProcess = nullptr;
+    QNetworkAccessManager *speedTestNetworkManager = nullptr;
+    QNetworkReply *speedTestReply = nullptr;
+    QElapsedTimer speedTestTimer;
+    QVector<double> speedTestLatencies;
+    int speedTestLatencyProbes = 0;
+    qint64 speedTestDownloadBytes = 0;
+    qint64 speedTestDownloadElapsedMs = 0;
+    qint64 speedTestUploadElapsedMs = 0;
     QPushButton *themeButton = nullptr;
     QPushButton *autoRefreshButton = nullptr;
     QPushButton *speedTestButton = nullptr;

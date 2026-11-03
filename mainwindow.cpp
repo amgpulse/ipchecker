@@ -30,15 +30,14 @@
 #include <QNetworkInterface>
 #include <QNetworkRequest>
 #include <QMessageBox>
-#include <QProcess>
 #include <QPushButton>
 #include <QSettings>
-#include <QStandardPaths>
 #include <QStatusBar>
 #include <QTableWidget>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <numeric>
 
 namespace {
 
@@ -76,6 +75,15 @@ QString replyErrorText(QNetworkReply *reply)
     }
 }
 
+QNetworkRequest speedTestRequest(const QUrl &url)
+{
+    QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
+    request.setRawHeader("Cache-Control", "no-cache");
+    request.setRawHeader("Accept-Encoding", "identity");
+    return request;
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
@@ -87,6 +95,9 @@ MainWindow::MainWindow(QWidget *parent)
 {
     networkManager->setTransferTimeout(kNetworkTimeoutMs);
     networkManager->setRedirectPolicy(QNetworkRequest::NoLessSafeRedirectPolicy);
+    speedTestNetworkManager = new QNetworkAccessManager(this);
+    speedTestNetworkManager->setTransferTimeout(60000);
+    speedTestNetworkManager->setRedirectPolicy(QNetworkRequest::NoLessSafeRedirectPolicy);
 
     loadSettings();
     setupUi();
@@ -429,7 +440,7 @@ void MainWindow::setupUi()
     speedTestButton = new QPushButton(tr("Speed Test"), this);
     speedTestButton->setFixedSize(115, 35);
     speedTestButton->setFont(sizedFont(11, true));
-    speedTestButton->setToolTip(tr("Measure download, upload, and latency with Ookla Speedtest"));
+    speedTestButton->setToolTip(tr("Measure download, upload, and latency using Cloudflare"));
     buttonLayout->addWidget(speedTestButton);
     connect(speedTestButton, &QPushButton::clicked, this, &MainWindow::startSpeedTest);
 
@@ -912,97 +923,151 @@ void MainWindow::clearHistory()
 
 void MainWindow::startSpeedTest()
 {
-    if (speedTestProcess && speedTestProcess->state() != QProcess::NotRunning) {
-        return;
-    }
-
-    const QString executable = QStandardPaths::findExecutable(QStringLiteral("speedtest"));
-    if (executable.isEmpty()) {
-        QMessageBox::information(
-            this, tr("Ookla Speedtest CLI Required"),
-            tr("Install the official Ookla Speedtest CLI and make sure the 'speedtest' command is "
-               "available on PATH."));
+    if (speedTestReply) {
         return;
     }
 
     const QMessageBox::StandardButton consent = QMessageBox::question(
-        this, tr("Run Ookla Speedtest"),
-        tr("This test sends network traffic to Ookla Speedtest servers and may use a significant "
-           "amount of data. Continuing also accepts the Ookla CLI license and GDPR terms. Do you "
-           "want to continue?"),
+        this, tr("Run Internet Speed Test"),
+        tr("This test connects to Cloudflare and transfers about 12 MB of test data to measure "
+           "download, upload, and latency. Do you want to continue?"),
         QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
     if (consent != QMessageBox::Yes) {
         return;
     }
 
-    if (!speedTestProcess) {
-        speedTestProcess = new QProcess(this);
-        connect(speedTestProcess, &QProcess::finished, this, &MainWindow::onSpeedTestFinished);
-        connect(speedTestProcess, &QProcess::errorOccurred, this, &MainWindow::onSpeedTestError);
-    }
-
+    speedTestLatencies.clear();
+    speedTestLatencyProbes = 0;
+    speedTestDownloadBytes = 0;
+    speedTestDownloadElapsedMs = 0;
+    speedTestUploadElapsedMs = 0;
     speedTestButton->setEnabled(false);
     speedTestButton->setText(tr("Testing..."));
-    toast(tr("Running Ookla Speedtest; this may take a little while."), 10000);
-    speedTestProcess->start(executable,
-                            {QStringLiteral("--accept-license"), QStringLiteral("--accept-gdpr"),
-                             QStringLiteral("--format=json")});
+    toast(tr("Measuring latency with Cloudflare..."), 10000);
+    runSpeedTestLatencyProbe();
 }
 
-void MainWindow::onSpeedTestFinished(int exitCode, QProcess::ExitStatus exitStatus)
+void MainWindow::runSpeedTestLatencyProbe()
 {
-    const QByteArray output = speedTestProcess->readAllStandardOutput();
-    const QString errorOutput = QString::fromLocal8Bit(speedTestProcess->readAllStandardError()).trimmed();
-    speedTestButton->setEnabled(true);
-    speedTestButton->setText(tr("Speed Test"));
-
-    if (exitStatus != QProcess::NormalExit || exitCode != 0) {
-        const QString details = errorOutput.isEmpty() ? tr("Ookla Speedtest exited with code %1.").arg(exitCode)
-                                                      : errorOutput;
-        QMessageBox::warning(this, tr("Speed Test Failed"), details);
-        return;
-    }
-
-    const NetUtils::SpeedTestResult result = NetUtils::parseSpeedTestJson(output);
-    if (!result.parsed) {
-        const QString details = errorOutput.isEmpty() ? tr("The CLI returned an invalid result.")
-                                                      : errorOutput;
-        QMessageBox::warning(this, tr("Speed Test Failed"), details);
-        return;
-    }
-
-    QString summary = tr("Download: %1 Mbps\nUpload: %2 Mbps\nLatency: %3 ms")
-                          .arg(result.downloadMbps, 0, 'f', 2)
-                          .arg(result.uploadMbps, 0, 'f', 2)
-                          .arg(result.latencyMs, 0, 'f', 2);
-    QStringList serverParts;
-    if (!result.serverName.isEmpty()) {
-        serverParts << result.serverName;
-    }
-    if (!result.serverLocation.isEmpty()) {
-        serverParts << result.serverLocation;
-    }
-    const QString server = serverParts.join(QStringLiteral(", "));
-    if (!server.isEmpty()) {
-        summary += QStringLiteral("\n") + tr("Server: %1").arg(server);
-    }
-    if (!result.resultUrl.isEmpty()) {
-        summary += QStringLiteral("\n\n") + tr("Result: %1").arg(result.resultUrl);
-    }
-    QMessageBox::information(this, tr("Speed Test Results"), summary);
+    const QUrl url(QStringLiteral("https://speed.cloudflare.com/__down?bytes=0"));
+    speedTestTimer.start();
+    speedTestReply = speedTestNetworkManager->get(speedTestRequest(url));
+    connect(speedTestReply, &QNetworkReply::finished, this, [this]() {
+        onSpeedTestLatencyFinished(speedTestReply);
+    });
 }
 
-void MainWindow::onSpeedTestError(QProcess::ProcessError error)
+void MainWindow::onSpeedTestLatencyFinished(QNetworkReply *reply)
 {
-    if (error != QProcess::FailedToStart) {
+    speedTestReply = nullptr;
+    reply->deleteLater();
+    if (reply->error() != QNetworkReply::NoError) {
+        finishSpeedTest(reply->errorString());
         return;
     }
 
+    reply->readAll();
+    ++speedTestLatencyProbes;
+    if (speedTestLatencyProbes > 1) {
+        speedTestLatencies.append(static_cast<double>(speedTestTimer.elapsed()));
+    }
+
+    if (speedTestLatencyProbes < 4) {
+        runSpeedTestLatencyProbe();
+        return;
+    }
+    runSpeedTestDownload();
+}
+
+void MainWindow::runSpeedTestDownload()
+{
+    constexpr qint64 downloadSize = 10 * 1024 * 1024;
+    const QUrl url(QStringLiteral("https://speed.cloudflare.com/__down?bytes=%1").arg(downloadSize));
+    toast(tr("Measuring download speed..."), 10000);
+    speedTestTimer.start();
+    speedTestReply = speedTestNetworkManager->get(speedTestRequest(url));
+    connect(speedTestReply, &QNetworkReply::finished, this, [this]() {
+        onSpeedTestDownloadFinished(speedTestReply);
+    });
+}
+
+void MainWindow::onSpeedTestDownloadFinished(QNetworkReply *reply)
+{
+    speedTestReply = nullptr;
+    const QByteArray payload = reply->readAll();
+    const QString error = reply->errorString();
+    const QNetworkReply::NetworkError networkError = reply->error();
+    reply->deleteLater();
+    if (networkError != QNetworkReply::NoError) {
+        finishSpeedTest(error);
+        return;
+    }
+    if (payload.isEmpty()) {
+        finishSpeedTest(tr("Cloudflare returned no download data."));
+        return;
+    }
+
+    speedTestDownloadBytes = payload.size();
+    speedTestDownloadElapsedMs = qMax<qint64>(speedTestTimer.elapsed(), 1);
+    runSpeedTestUpload();
+}
+
+void MainWindow::runSpeedTestUpload()
+{
+    constexpr int uploadSize = 2 * 1024 * 1024;
+    const QUrl url(QStringLiteral("https://speed.cloudflare.com/__up"));
+    const QByteArray payload(uploadSize, '\0');
+    toast(tr("Measuring upload speed..."), 10000);
+    speedTestTimer.start();
+    QNetworkRequest request = speedTestRequest(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/octet-stream"));
+    speedTestReply = speedTestNetworkManager->post(request, payload);
+    connect(speedTestReply, &QNetworkReply::uploadProgress, this, [this](qint64 sent, qint64 total) {
+        if (total > 0 && sent >= total && speedTestUploadElapsedMs == 0) {
+            speedTestUploadElapsedMs = qMax<qint64>(speedTestTimer.elapsed(), 1);
+        }
+    });
+    connect(speedTestReply, &QNetworkReply::finished, this, [this]() {
+        onSpeedTestUploadFinished(speedTestReply);
+    });
+}
+
+void MainWindow::onSpeedTestUploadFinished(QNetworkReply *reply)
+{
+    speedTestReply = nullptr;
+    const QString error = reply->errorString();
+    const QNetworkReply::NetworkError networkError = reply->error();
+    reply->deleteLater();
+    if (networkError != QNetworkReply::NoError) {
+        finishSpeedTest(error);
+        return;
+    }
+
+    const qint64 uploadElapsedMs = speedTestUploadElapsedMs > 0
+                                       ? speedTestUploadElapsedMs
+                                       : qMax<qint64>(speedTestTimer.elapsed(), 1);
+    constexpr qint64 uploadSize = 2 * 1024 * 1024;
+    const double averageLatency = std::accumulate(speedTestLatencies.cbegin(),
+                                                   speedTestLatencies.cend(), 0.0)
+                                  / speedTestLatencies.size();
+    const QString result = tr("Download: %1 Mbps\nUpload: %2 Mbps\nLatency: %3 ms\nServer: Cloudflare")
+                               .arg(NetUtils::speedMbps(speedTestDownloadBytes,
+                                                       speedTestDownloadElapsedMs), 0, 'f', 2)
+                               .arg(NetUtils::speedMbps(uploadSize, uploadElapsedMs), 0, 'f', 2)
+                               .arg(averageLatency, 0, 'f', 2);
+    finishSpeedTest();
+    QMessageBox::information(this, tr("Speed Test Results"), result);
+}
+
+void MainWindow::finishSpeedTest(const QString &error)
+{
+    speedTestReply = nullptr;
     speedTestButton->setEnabled(true);
     speedTestButton->setText(tr("Speed Test"));
-    QMessageBox::warning(this, tr("Speed Test Failed"),
-                         tr("Could not start Ookla Speedtest. Check that the CLI is installed and "
-                            "available on PATH."));
+    if (!error.isEmpty()) {
+        QMessageBox::warning(this, tr("Speed Test Failed"),
+                             tr("The test could not be completed: %1").arg(error));
+    }
 }
 
 void MainWindow::copyToLocalClipboard()

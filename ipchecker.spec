@@ -1,5 +1,5 @@
 Name:           ipchecker
-Version:        1.4.1
+Version:        1.4.2
 Release:        1%{?dist}
 Summary:        IP Inspector Pro - Modern Qt6 network identity inspector
 License:        MIT

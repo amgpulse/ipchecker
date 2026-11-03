@@ -19,8 +19,7 @@ private slots:
     void parseGeoInfo_data();
     void parseGeoInfo();
 
-    void parseSpeedTestJson_data();
-    void parseSpeedTestJson();
+    void speedMbps();
 };
 
 void TestNetUtils::parsePublicIp_data()
@@ -140,39 +139,13 @@ void TestNetUtils::parseGeoInfo()
     QCOMPARE(info.errorReason, errorReason);
 }
 
-void TestNetUtils::parseSpeedTestJson_data()
+void TestNetUtils::speedMbps()
 {
-    QTest::addColumn<QByteArray>("payload");
-    QTest::addColumn<bool>("parsed");
-    QTest::addColumn<double>("downloadMbps");
-    QTest::addColumn<double>("uploadMbps");
-    QTest::addColumn<double>("latencyMs");
-
-    QTest::newRow("valid")
-        << QByteArray(R"({"download":{"bandwidth":12500000},"upload":{"bandwidth":2500000},)"
-                      R"("ping":{"latency":12.5},"server":{"name":"Server","location":"City"},)"
-                      R"("result":{"url":"https://www.speedtest.net/result/123"}})")
-        << true << 100.0 << 20.0 << 12.5;
-    QTest::newRow("invalid-json") << QByteArray("{oops") << false << 0.0 << 0.0 << 0.0;
-    QTest::newRow("missing-fields") << QByteArray("{}") << false << 0.0 << 0.0 << 0.0;
-    QTest::newRow("negative-bandwidth")
-        << QByteArray(R"({"download":{"bandwidth":-1},"upload":{"bandwidth":1},"ping":{"latency":1}})")
-        << false << 0.0 << 0.0 << 0.0;
-}
-
-void TestNetUtils::parseSpeedTestJson()
-{
-    QFETCH(QByteArray, payload);
-    QFETCH(bool, parsed);
-    QFETCH(double, downloadMbps);
-    QFETCH(double, uploadMbps);
-    QFETCH(double, latencyMs);
-
-    const NetUtils::SpeedTestResult result = NetUtils::parseSpeedTestJson(payload);
-    QCOMPARE(result.parsed, parsed);
-    QCOMPARE(result.downloadMbps, downloadMbps);
-    QCOMPARE(result.uploadMbps, uploadMbps);
-    QCOMPARE(result.latencyMs, latencyMs);
+    QCOMPARE(NetUtils::speedMbps(1250000, 1000), 10.0);
+    QCOMPARE(NetUtils::speedMbps(10000000, 2000), 40.0);
+    QCOMPARE(NetUtils::speedMbps(0, 1000), 0.0);
+    QCOMPARE(NetUtils::speedMbps(1000, 0), 0.0);
+    QCOMPARE(NetUtils::speedMbps(-1000, 1000), 0.0);
 }
 
 QTEST_GUILESS_MAIN(TestNetUtils)
